@@ -7,7 +7,7 @@ var canvas, ctx, img;
 function init() {
   canvas = document.getElementById("canvas");
   ctx = canvas.getContext("2d");
-  
+
   img = new Image();
   img.addEventListener("load", imgLoaded, false);
   img.src = url;
@@ -22,4 +22,7 @@ function generateDelaunay() {
   var width = canvas.width = img.width;
   var height = canvas.height = img.height;
   ctx.drawImage(img, 0, 0, width, height);
+
+  var imgData = ctx.getImageData(0, 0, width, height);
+  console.log(imgData);
 }
