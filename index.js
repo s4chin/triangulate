@@ -72,6 +72,79 @@ class Triangle {
 
 }
 
+class Delaunay {
+  constructor(width, height) {
+    this.width = width;
+    this.height = height;
+    this.triangles = [];
+    this.init();
+  }
+
+  init() {
+    var p1 = new Point(0, 0);
+    var p2 = new Point(this.width, 0);
+    var p3 = new Point(0, this.height);
+    var p4 = new Point(this.width, this.height);
+    this.triangles = [
+      new Triangle(p1, p2, p3),
+      new Triangle(p2, p3, p4)
+    ]
+  }
+
+  // points is an array of Point objects
+  insert(points) {
+    var i, j, passtri, edges, edge, dup, x, y, shape;
+    var triangles, triangle, circle, dx, dy, distSq;
+    for(i = 0; i < points.length; i++) {
+      x = points[i].x;
+      y = points[i].y;
+
+      triangles = this.triangles;
+      passtri = [];
+      edges = [];
+
+      // Separate the existing triangles into those in which the point lies
+      // within the circumcircle and those without
+      for(j = 0; j < triangles.length; j++) {
+        triangle = triangles[j];
+        circle = triangle.circle;
+        dx = x - circle.x;
+        dy = y - circle.y;
+        distSq = dx*dx + dy*dy;
+        if(circle.radiusSq < distSq) {
+          passtri.push(triangle);
+        } else {
+          Array.prototype.push.apply(edges, triangle.edge);
+        }
+      }
+
+      // Remove common edges between the triangles
+      shape = [];
+      for(i = 0; i < edges.length; i++) {
+        dup = false;
+        edge = edges[i];
+        for(j = 0; j < shape.length; j++) {
+          if(Edge.isEqual(edge, shape[j])) {
+            shape.splice(j, 1);
+            dup = true;
+            break;
+          }
+        }
+        if(!dup) {
+          shape.push(edge);
+        }
+      }
+
+      // Add new triangles from the point to each edge
+      for(i = 0; i < shape.length; i++) {
+        edge = shape[i];
+        passtri.push(new Triangle(edge.first, edge.second, new Point(x, y)));
+      }
+      this.triangles = passtri;
+    }
+  }
+}
+
 function init() {
   canvas = document.getElementById("canvas");
   ctx = canvas.getContext("2d");
