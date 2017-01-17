@@ -4,6 +4,8 @@ var url = "canvas.png";
 
 var canvas, ctx, img;
 var TOLERANCE = 0.001;
+var BLUR_SIZE = 5;
+var EDGE_SIZE = 7;
 
 class Point {
   constructor(x, y) {
@@ -145,6 +147,113 @@ class Delaunay {
   }
 }
 
+var Filters = {
+  // Gray filter and conv filter are functions while the rest are matrices
+  grayFilterF: function(imageData) {
+    var width = imageData.width;
+    var height = imageData.height;
+    var data = imageData.data;
+
+    // data is a 1D array of RGBA values of pixels
+    for(row = 0; row < height; row++) {
+
+      jump = row*width;
+      for(col = 0; col < width; col++) {
+        i = (jump + col)*4;
+        r = data[i];
+        g = data[i+1];
+        b = data[i+2];
+        data[i] = 0.299*r + 0.587*g + 0.114*b;
+      }
+    }
+  },
+
+  // Taken directly from here - http://jsdo.it/akm2/iMsL
+  convFilterF: function(matrix, imageData, divisor) {
+      matrix  = matrix.slice();
+      divisor = divisor || 1;
+
+      var divscalar = divisor ? 1 / divisor : 0;
+      var k, len;
+      if (divscalar !== 1) {
+          for (k = 0, len = matrix.length; k < matrix.length; k++) {
+              matrix[k] *= divscalar;
+          }
+      }
+
+      var data = imageData.data;
+
+      len = data.length >> 2;
+      var copy = new Uint8Array(len);
+      for (i = 0; i < len; i++) copy[i] = data[i << 2];
+
+      var width  = imageData.width | 0;
+      var height = imageData.height | 0;
+      var size  = Math.sqrt(matrix.length);
+      var range = size * 0.5 | 0;
+
+      var x, y;
+      var r, g, b, v;
+      var col, row, sx, sy;
+      var i, istep, jstep, kstep;
+
+      for (y = 0; y < height; y++) {
+          istep = y * width;
+
+          for (x = 0; x < width; x++) {
+              r = g = b = 0;
+
+              for (row = -range; row <= range; row++) {
+                  sy = y + row;
+                  jstep = sy * width;
+                  kstep = (row + range) * size;
+
+                  if (sy >= 0 && sy < height) {
+                      for (col = -range; col <= range; col++) {
+                          sx = x + col;
+
+                          if (
+                              sx >= 0 && sx < width &&
+                              (v = matrix[(col + range) + kstep])
+                          ) {
+                              r += copy[sx + jstep] * v;
+                          }
+                      }
+                  }
+              }
+
+              if (r < 0) r = 0; else if (r > 255) r = 255;
+
+              data[(x + istep) << 2] = r & 0xFF;
+          }
+      }
+
+      return imageData;
+  },
+}
+
+// Box blur
+// TODO: Add Gaussian blur to see results
+var blur = (function() {
+  var i;
+  var blur = [];
+  for(i = 0; i < BLUR_SIZE*BLUR_SIZE; i++) {
+    blur.push(1);
+  }
+  return blur;
+})();
+
+// Edge filter
+var edge = (function() {
+  var edge = [];
+  var len = EDGE_SIZE*EDGE_SIZE;
+  for(i = 0; i < len; i++) {
+    edge.push(1);
+  }
+  edge[Math.floor(len/2)] = 1 - len;
+  return edge;
+})();
+
 function init() {
   canvas = document.getElementById("canvas");
   ctx = canvas.getContext("2d");
@@ -167,5 +276,8 @@ function generateDelaunay() {
   var imgData = ctx.getImageData(0, 0, width, height);
   var colData = ctx.getImageData(0, 0, width, height).data;
 
-
+  Filters.grayFilterF(imgData);
+  Filters.convFilterF(blur, imgData, blur.length);
+  Filters.convFilterF(edge, imgData);
+  ctx.putImageData(imgData, 0, 0);
 }
