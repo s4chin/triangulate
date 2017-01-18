@@ -6,6 +6,8 @@ var canvas, ctx, img;
 var TOLERANCE = 0.001;
 var BLUR_SIZE = 5;
 var EDGE_SIZE = 7;
+var EDGE_THRESHOLD = 50;
+var MAX_POINT_RATE = 0.003;
 
 class Point {
   constructor(x, y) {
@@ -148,11 +150,12 @@ class Delaunay {
 }
 
 var Filters = {
-  // Gray filter and conv filter are functions while the rest are matrices
+  // Replaces R with gray value
   grayFilterF: function(imageData) {
     var width = imageData.width;
     var height = imageData.height;
     var data = imageData.data;
+    var gray;
 
     // data is a 1D array of RGBA values of pixels
     for(row = 0; row < height; row++) {
@@ -163,7 +166,10 @@ var Filters = {
         r = data[i];
         g = data[i+1];
         b = data[i+2];
-        data[i] = 0.299*r + 0.587*g + 0.114*b;
+        gray = 0.299*r + 0.587*g + 0.114*b;
+        data[i] = gray;
+        // data[i+1] = gray;
+        // data[i+2] = gray;
       }
     }
   },
@@ -279,5 +285,49 @@ function generateDelaunay() {
   Filters.grayFilterF(imgData);
   Filters.convFilterF(blur, imgData, blur.length);
   Filters.convFilterF(edge, imgData);
+
+  var points = getPoints(imgData);
+  var limit = width*height*MAX_POINT_RATE;
+  if(points.length > limit) {
+    points = removePoints(points, limit);
+  }
+  console.log(points);
   ctx.putImageData(imgData, 0, 0);
+}
+
+function removePoints(points, limit) {
+  var len = points.length;
+  while(len > limit) {
+    points.splice(Math.floor(Math.random()*len), 1);
+    len--;
+  }
+  return points;
+}
+
+function getPoints(imageData) {
+  var row, col, i, j, sum, total, jump;
+  var points = [];
+  var width = imageData.width;
+  var height = imageData.height;
+  var data = imageData.data;
+  for(row = 0; row < height; row++) {
+    for(col = 0; col < width; col++) {
+      sum = 0;
+      for(i = -1; i <= 1; i++) {
+        if(row + i < height && row + i > 0) {
+          jump = (row + i)*width;
+          for(j = -1; j <=1; j++) {
+            if(col + j < width && col + j > 0) {
+              x = (jump + (col + j))*4;
+              sum += data[x];
+              total = 0;
+            }
+          }
+        }
+      }
+      if(sum/total > EDGE_THRESHOLD)
+        points.push(new Point(col, row));
+    }
+  }
+  return points;
 }
