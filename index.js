@@ -2,12 +2,13 @@ window.addEventListener('load', init, false);
 
 var url = "canvas.png";
 
-var canvas, ctx, img;
+var canvas, ctx, img, image;
 var TOLERANCE = 0.001;
 var BLUR_SIZE = 5;
 var EDGE_SIZE = 7;
 var EDGE_THRESHOLD = 50;
-var MAX_POINT_RATE = 0.003;
+var POINT_RATE = 0.0005;
+var MAX_POINTS = 5000;
 
 class Point {
   constructor(x, y) {
@@ -146,6 +147,7 @@ class Delaunay {
       }
       this.triangles = passtri;
     }
+    return this.triangles;
   }
 }
 
@@ -162,7 +164,7 @@ var Filters = {
 
       jump = row*width;
       for(col = 0; col < width; col++) {
-        i = (jump + col)*4;
+        i = (jump + col) << 2;
         r = data[i];
         g = data[i+1];
         b = data[i+2];
@@ -256,7 +258,7 @@ var edge = (function() {
   for(i = 0; i < len; i++) {
     edge.push(1);
   }
-  edge[Math.floor(len/2)] = 1 - len;
+  edge[len >> 1] = 1 - len;
   return edge;
 })();
 
@@ -267,11 +269,11 @@ function init() {
   img = new Image();
   img.addEventListener("load", imgLoaded, false);
   img.src = url;
+  generateDelaunay();
 }
 
 function imgLoaded() {
   // Statements to be executed after image is loaded but before it is drawn
-  generateDelaunay();
 }
 
 function generateDelaunay() {
@@ -287,12 +289,22 @@ function generateDelaunay() {
   Filters.convFilterF(edge, imgData);
 
   var points = getPoints(imgData);
-  var limit = width*height*MAX_POINT_RATE;
-  if(points.length > limit) {
-    points = removePoints(points, limit);
+  /* We got ALL the points comprising the edge, to form traingles we need much
+     lesser number of points, i.e. points.length*POINT_RATE. Also, we do not
+     want the number of points to exceed MAX_POINTS as the triangulation will
+     take more time */
+  var limit = points.length*POINT_RATE;
+  if(limit > MAX_POINTS) {
+    limit = MAX_POINTS
   }
-  console.log(points);
+  // points = removePoints(points, limit);
+  console.log(points.length);
   ctx.putImageData(imgData, 0, 0);
+
+  var delaunay = new Delaunay(width, height);
+  var triangles = delaunay.insert(points);
+  console.log(triangles);
+  ctx.fillRect(10, 10, 55, 50);
 }
 
 function removePoints(points, limit) {
@@ -318,7 +330,7 @@ function getPoints(imageData) {
           jump = (row + i)*width;
           for(j = -1; j <=1; j++) {
             if(col + j < width && col + j > 0) {
-              x = (jump + (col + j))*4;
+              x = (jump + (col + j)) << 2;
               sum += data[x];
               total = 0;
             }
