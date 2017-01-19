@@ -1,25 +1,19 @@
 window.addEventListener('load', init, false);
 
-var url = "canvas.png";
+var url = "ctx.jpg";
 
 var canvas, ctx, img, image;
-var TOLERANCE = 0.001;
+var TOLERANCE = 0.1;
 var BLUR_SIZE = 5;
 var EDGE_SIZE = 7;
 var EDGE_THRESHOLD = 50;
-var POINT_RATE = 0.0015;
-var MAX_POINTS = 4;
+var POINT_RATE = 0.08;
+var MAX_POINTS = 3000;
 
 class Point {
   constructor(x, y) {
     this.x = x|0;
     this.y = y|0;
-  }
-
-  static distance(p1, p2) {
-    var dx = p1.x - p2.x;
-    var dy = p1.y - p2.y;
-    return math.sqrt(dx*dx + dy*dy);
   }
 
   static distanceSq(p1, p2) {
@@ -45,8 +39,12 @@ class Edge {
   }
 
   static isEqual(e1, e2) {
-    return (Point.isEqual(e1.first, e2.first) && Point.isEqual(e1.second, e2.second)) ||
+    var val = (Point.isEqual(e1.first, e2.first) && Point.isEqual(e1.second, e2.second)) ||
       (Point.isEqual(e1.second, e2.first) && Point.isEqual(e1.first, e2.second));
+    // console.log(e1, e2, val);
+    // return (Point.isEqual(e1.first, e2.first) && Point.isEqual(e1.second, e2.second)) ||
+    //   (Point.isEqual(e1.second, e2.first) && Point.isEqual(e1.first, e2.second));
+    return val;
   }
 }
 
@@ -60,19 +58,35 @@ class Triangle {
        perpendicular bisector; Find the point of intersection of those
        bisectors. Then the radius is the distace from the center to any point
     */
-    var circle = new Object();
-    var mp1x = (p1.x + p2.x)/2;
-    var mp1y = (p1.y + p2.y)/2;
-    var slope1 = -1*(p2.x - p1.x)/(p2.y - p1.y);
-    var mp2x = (p3.x + p2.x)/2;
-    var mp2y = (p3.y + p2.y)/2;
-    var slope2 = -1*(p2.x - p3.x)/(p2.y - p3.y);
-    circle.x = (slope2*mp2x - slope1*mp1x + mp1y - mp2y)/(slope2 - slope1);
-    circle.y = mp1y + slope1*(circle.x-mp1x);
-    var dx = circle.x - p1.x;
-    var dy = circle.y - p1.y;
-    circle.radiusSq = (dx*dx + dy*dy);
-    this.circle = circle;
+    // var circle = new Object();
+    // var mp1x = (p1.x + p2.x)/2;
+    // var mp1y = (p1.y + p2.y)/2;
+    // var slope1 = -1*(p2.x - p1.x)/(p2.y - p1.y);
+    // var mp2x = (p3.x + p2.x)/2;
+    // var mp2y = (p3.y + p2.y)/2;
+    // var slope2 = -1*(p2.x - p3.x)/(p2.y - p3.y);
+    // circle.x = (slope2*mp2x - slope1*mp1x + mp1y - mp2y)/(slope2 - slope1);
+    // circle.y = mp1y + slope1*(circle.x-mp1x);
+    // var dx = circle.x - p1.x;
+    // var dy = circle.y - p1.y;
+    // circle.radiusSq = (dx*dx + dy*dy);
+    // this.circle = circle;
+
+    var circle = this.circle = new Object();
+
+    var ax = p2.x - p1.x, ay = p2.y - p1.y,
+        bx = p3.x - p1.x, by = p3.y - p1.y,
+        t = (p2.x * p2.x - p1.x * p1.x + p2.y * p2.y - p1.y * p1.y),
+        u = (p3.x * p3.x - p1.x * p1.x + p3.y * p3.y - p1.y * p1.y);
+
+    var s = 1 / (2 * (ax * by - ay * bx));
+
+    circle.x = ((p3.y - p1.y) * t + (p1.y - p2.y) * u) * s;
+    circle.y = ((p1.x - p3.x) * t + (p2.x - p1.x) * u) * s;
+
+    var dx = p1.x - circle.x;
+    var dy = p1.y - circle.y;
+    circle.radiusSq = dx * dx + dy * dy;
   }
 
 }
@@ -100,7 +114,7 @@ class Delaunay {
 }
 
 Delaunay.prototype.insert =  function(points) {
-  var i, j, passtri, edges, edge, dup, x, y, shape;
+  var i, j, k, passtri, edges, edge, dup, x, y, shape;
   var triangles, triangle, circle, dx, dy, distSq;
   for(i = 0; i < points.length; i++) {
     x = points[i][0];
@@ -127,9 +141,9 @@ Delaunay.prototype.insert =  function(points) {
 
     // Remove common edges between the triangles
     shape = [];
-    for(i = 0; i < edges.length; i++) {
+    for(k = 0; k < edges.length; k++) {
       dup = false;
-      edge = edges[i];
+      edge = edges[k];
       for(j = 0; j < shape.length; j++) {
         if(Edge.isEqual(edge, shape[j])) {
           shape.splice(j, 1);
@@ -143,8 +157,8 @@ Delaunay.prototype.insert =  function(points) {
     }
 
     // Add new triangles from the point to each edge
-    for(i = 0; i < shape.length; i++) {
-      edge = shape[i];
+    for(k = 0; k < shape.length; k++) {
+      edge = shape[k];
       passtri.push(new Triangle(edge.first, edge.second, new Point(x, y)));
     }
     this.triangles = passtri;
@@ -279,8 +293,8 @@ function imgLoaded() {
 }
 
 function generateDelaunay() {
-  var width = canvas.width = img.width;
-  var height = canvas.height = img.height;
+  var width = canvas.width = img.width/4;
+  var height = canvas.height = img.height/4;
   ctx.drawImage(img, 0, 0, width, height);
 
   var imgData = ctx.getImageData(0, 0, width, height);
@@ -301,17 +315,12 @@ function generateDelaunay() {
     limit = MAX_POINTS
   }
   points = removePoints(points, limit);
-  console.log(points.length);
 
   var delaunay = new Delaunay(width, height);
   var triangles = delaunay.insert(points);
-  console.log(triangles);
-  // ctx.fillRect(10, 10, 55, 50);
 
   var t, p0, p1, p2, cx, cy;
 
-  // 三角形を塗る
-  ctx.clearRect(0, 0, width, height)
   for (i = 0; i < triangles.length; i++) {
       t = triangles[i];
       p0 = t.vertex[0]; p1 = t.vertex[1]; p2 = t.vertex[2];
@@ -322,14 +331,12 @@ function generateDelaunay() {
       ctx.lineTo(p2.x, p2.y);
       ctx.lineTo(p0.x, p0.y);
 
-      // 重心を取得してその座標の色で三角形を塗りつぶす
       cx = (p0.x + p1.x + p2.x) * 0.33333;
       cy = (p0.y + p1.y + p2.y) * 0.33333;
 
       j = ((cx | 0) + (cy | 0) * width) << 2;
 
       ctx.fillStyle = 'rgb(' + colData[j] + ', ' + colData[j + 1] + ', ' + colData[j + 2] + ')';
-      // ctx.fillStyle = 'rgb(250, 0, 250)';
       ctx.fill();
   }
 }
@@ -352,14 +359,15 @@ function getPoints(imageData) {
   for(row = 0; row < height; row++) {
     for(col = 0; col < width; col++) {
       sum = 0;
+      total = 0;
       for(i = -1; i <= 1; i++) {
-        if(row + i < height && row + i > 0) {
+        if((row + i) < height && (row + i) > 0) {
           jump = (row + i)*width;
           for(j = -1; j <=1; j++) {
-            if(col + j < width && col + j > 0) {
+            if((col + j) < width && (col + j) > 0) {
               x = (jump + (col + j)) << 2;
               sum += data[x];
-              total = 0;
+              total++;
             }
           }
         }
