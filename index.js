@@ -7,8 +7,8 @@ var TOLERANCE = 0.001;
 var BLUR_SIZE = 5;
 var EDGE_SIZE = 7;
 var EDGE_THRESHOLD = 50;
-var POINT_RATE = 0.0005;
-var MAX_POINTS = 5000;
+var POINT_RATE = 0.0015;
+var MAX_POINTS = 4;
 
 class Point {
   constructor(x, y) {
@@ -97,58 +97,59 @@ class Delaunay {
   }
 
   // points is an array of Point objects
-  insert(points) {
-    var i, j, passtri, edges, edge, dup, x, y, shape;
-    var triangles, triangle, circle, dx, dy, distSq;
-    for(i = 0; i < points.length; i++) {
-      x = points[i].x;
-      y = points[i].y;
+}
 
-      triangles = this.triangles;
-      passtri = [];
-      edges = [];
+Delaunay.prototype.insert =  function(points) {
+  var i, j, passtri, edges, edge, dup, x, y, shape;
+  var triangles, triangle, circle, dx, dy, distSq;
+  for(i = 0; i < points.length; i++) {
+    x = points[i][0];
+    y = points[i][1];
 
-      // Separate the existing triangles into those in which the point lies
-      // within the circumcircle and those without
-      for(j = 0; j < triangles.length; j++) {
-        triangle = triangles[j];
-        circle = triangle.circle;
-        dx = x - circle.x;
-        dy = y - circle.y;
-        distSq = dx*dx + dy*dy;
-        if(circle.radiusSq < distSq) {
-          passtri.push(triangle);
-        } else {
-          Array.prototype.push.apply(edges, triangle.edge);
-        }
+    triangles = this.triangles;
+    passtri = [];
+    edges = [];
+
+    // Separate the existing triangles into those in which the point lies
+    // within the circumcircle and those without
+    for(j = 0; j < triangles.length; j++) {
+      triangle = triangles[j];
+      circle = triangle.circle;
+      dx = x - circle.x;
+      dy = y - circle.y;
+      distSq = dx*dx + dy*dy;
+      if(circle.radiusSq < distSq) {
+        passtri.push(triangle);
+      } else {
+        Array.prototype.push.apply(edges, triangle.edge);
       }
-
-      // Remove common edges between the triangles
-      shape = [];
-      for(i = 0; i < edges.length; i++) {
-        dup = false;
-        edge = edges[i];
-        for(j = 0; j < shape.length; j++) {
-          if(Edge.isEqual(edge, shape[j])) {
-            shape.splice(j, 1);
-            dup = true;
-            break;
-          }
-        }
-        if(!dup) {
-          shape.push(edge);
-        }
-      }
-
-      // Add new triangles from the point to each edge
-      for(i = 0; i < shape.length; i++) {
-        edge = shape[i];
-        passtri.push(new Triangle(edge.first, edge.second, new Point(x, y)));
-      }
-      this.triangles = passtri;
     }
-    return this.triangles;
+
+    // Remove common edges between the triangles
+    shape = [];
+    for(i = 0; i < edges.length; i++) {
+      dup = false;
+      edge = edges[i];
+      for(j = 0; j < shape.length; j++) {
+        if(Edge.isEqual(edge, shape[j])) {
+          shape.splice(j, 1);
+          dup = true;
+          break;
+        }
+      }
+      if(!dup) {
+        shape.push(edge);
+      }
+    }
+
+    // Add new triangles from the point to each edge
+    for(i = 0; i < shape.length; i++) {
+      edge = shape[i];
+      passtri.push(new Triangle(edge.first, edge.second, new Point(x, y)));
+    }
+    this.triangles = passtri;
   }
+  return this.triangles;
 }
 
 var Filters = {
@@ -267,13 +268,14 @@ function init() {
   ctx = canvas.getContext("2d");
 
   img = new Image();
+  img.crossOrigin = "Anonymous";
   img.addEventListener("load", imgLoaded, false);
   img.src = url;
-  generateDelaunay();
 }
 
 function imgLoaded() {
   // Statements to be executed after image is loaded but before it is drawn
+  generateDelaunay();
 }
 
 function generateDelaunay() {
@@ -289,6 +291,7 @@ function generateDelaunay() {
   Filters.convFilterF(edge, imgData);
 
   var points = getPoints(imgData);
+  imgData = null;
   /* We got ALL the points comprising the edge, to form traingles we need much
      lesser number of points, i.e. points.length*POINT_RATE. Also, we do not
      want the number of points to exceed MAX_POINTS as the triangulation will
@@ -297,14 +300,38 @@ function generateDelaunay() {
   if(limit > MAX_POINTS) {
     limit = MAX_POINTS
   }
-  // points = removePoints(points, limit);
+  points = removePoints(points, limit);
   console.log(points.length);
-  ctx.putImageData(imgData, 0, 0);
 
   var delaunay = new Delaunay(width, height);
   var triangles = delaunay.insert(points);
   console.log(triangles);
-  ctx.fillRect(10, 10, 55, 50);
+  // ctx.fillRect(10, 10, 55, 50);
+
+  var t, p0, p1, p2, cx, cy;
+
+  // 三角形を塗る
+  ctx.clearRect(0, 0, width, height)
+  for (i = 0; i < triangles.length; i++) {
+      t = triangles[i];
+      p0 = t.vertex[0]; p1 = t.vertex[1]; p2 = t.vertex[2];
+
+      ctx.beginPath();
+      ctx.moveTo(p0.x, p0.y);
+      ctx.lineTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.lineTo(p0.x, p0.y);
+
+      // 重心を取得してその座標の色で三角形を塗りつぶす
+      cx = (p0.x + p1.x + p2.x) * 0.33333;
+      cy = (p0.y + p1.y + p2.y) * 0.33333;
+
+      j = ((cx | 0) + (cy | 0) * width) << 2;
+
+      ctx.fillStyle = 'rgb(' + colData[j] + ', ' + colData[j + 1] + ', ' + colData[j + 2] + ')';
+      // ctx.fillStyle = 'rgb(250, 0, 250)';
+      ctx.fill();
+  }
 }
 
 function removePoints(points, limit) {
@@ -338,7 +365,7 @@ function getPoints(imageData) {
         }
       }
       if(sum/total > EDGE_THRESHOLD)
-        points.push(new Point(col, row));
+        points.push(new Array(col, row));
     }
   }
   return points;
