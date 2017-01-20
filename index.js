@@ -14,25 +14,27 @@ var setting = {
   MAX_PIXELS: 480000,
 };
 
-var gui = new dat.GUI();
-gui.add(setting, "POINT_RATE").min(0.01).max(0.1).step(0.005).onChange(function() {
-  if(img) generateDelaunay();
-});
-gui.add(setting, "BLUR_SIZE").min(3).max(9).step(2).onChange(function() {
-  if(img) generateDelaunay();
-});
-gui.add(setting, "EDGE_SIZE").min(3).max(9).step(2).onChange(function() {
-  if(img) generateDelaunay();
-});
-gui.add(setting, "EDGE_THRESHOLD").min(30).max(100).step(1).onChange(function() {
-  if(img) generateDelaunay();
-});
-gui.add(setting, "MAX_POINTS").min(100).max(4000).step(1).onChange(function() {
-  if(img) generateDelaunay();
-});
-gui.add(setting, "MAX_PIXELS").min(144*144).max(1366*768).step(1).onChange(function() {
-  if(img) generateDelaunay();
-});
+function setupGUI() {
+  var gui = new dat.GUI();
+  gui.add(setting, "POINT_RATE").min(0.01).max(0.1).step(0.005).onChange(function() {
+    if(img) generateDelaunay();
+  });
+  gui.add(setting, "BLUR_SIZE").min(3).max(9).step(2).onChange(function() {
+    if(img) generateDelaunay();
+  });
+  gui.add(setting, "EDGE_SIZE").min(3).max(9).step(2).onChange(function() {
+    if(img) generateDelaunay();
+  });
+  gui.add(setting, "EDGE_THRESHOLD").min(30).max(100).step(1).onChange(function() {
+    if(img) generateDelaunay();
+  });
+  gui.add(setting, "MAX_POINTS").min(100).max(4000).step(1).onChange(function() {
+    if(img) generateDelaunay();
+  });
+  gui.add(setting, "MAX_PIXELS").min(144*144).max(1366*768).step(1).onChange(function() {
+    if(img) generateDelaunay();
+  });
+}
 
 class Point {
   constructor(x, y) {
@@ -302,6 +304,8 @@ var edge = (function() {
 })();
 
 function init() {
+  setupGUI();
+
   canvas = document.getElementById("canvas");
   ctx = canvas.getContext("2d");
 
