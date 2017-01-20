@@ -309,6 +309,11 @@ function init() {
   canvas = document.getElementById("canvas");
   ctx = canvas.getContext("2d");
 
+  img = new Image();
+  img.crossOrigin = "Anonymous";
+  img.addEventListener("load", imgLoaded, false);
+  img.src = url;
+
   // For drag and drop image
   canvas.addEventListener("dragover", function (e) {
     e.preventDefault();
@@ -323,6 +328,10 @@ function init() {
         var reader = new FileReader();
         // Note: addEventListener doesn't work in Google Chrome for this event
         reader.onload = function (e) {
+          // Remove width and height to recalculate again later
+          // otherwise it remains persistent between images leading to skewed images
+          img.removeAttribute('width');
+          img.removeAttribute('height');
           img.src = e.target.result;
         };
         reader.readAsDataURL(file);
@@ -330,11 +339,6 @@ function init() {
     }
     e.preventDefault();
   }, false);
-
-  img = new Image();
-  img.crossOrigin = "Anonymous";
-  img.addEventListener("load", imgLoaded, false);
-  img.src = url;
 }
 
 function imgLoaded() {
