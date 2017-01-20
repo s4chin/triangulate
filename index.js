@@ -2,13 +2,37 @@ window.addEventListener('load', init, false);
 
 var url = "ctx.jpg";
 
-var canvas, ctx, img, image;
+var canvas, ctx, img;
 var TOLERANCE = 0.1;
-var BLUR_SIZE = 5;
-var EDGE_SIZE = 7;
-var EDGE_THRESHOLD = 50;
-var POINT_RATE = 0.08;
-var MAX_POINTS = 3000;
+
+var setting = {
+  POINT_RATE: 0.08,
+  BLUR_SIZE: 5,
+  EDGE_SIZE: 7,
+  EDGE_THRESHOLD: 50,
+  MAX_POINTS: 3000,
+  MAX_PIXELS: 480000,
+};
+
+var gui = new dat.GUI();
+gui.add(setting, "POINT_RATE").min(0.01).max(0.1).step(0.005).onChange(function() {
+  if(img) generateDelaunay();
+});
+gui.add(setting, "BLUR_SIZE").min(3).max(9).step(2).onChange(function() {
+  if(img) generateDelaunay();
+});
+gui.add(setting, "EDGE_SIZE").min(3).max(9).step(2).onChange(function() {
+  if(img) generateDelaunay();
+});
+gui.add(setting, "EDGE_THRESHOLD").min(30).max(100).step(1).onChange(function() {
+  if(img) generateDelaunay();
+});
+gui.add(setting, "MAX_POINTS").min(100).max(4000).step(1).onChange(function() {
+  if(img) generateDelaunay();
+});
+gui.add(setting, "MAX_PIXELS").min(144*144).max(1366*768).step(1).onChange(function() {
+  if(img) generateDelaunay();
+});
 
 class Point {
   constructor(x, y) {
@@ -260,7 +284,7 @@ var Filters = {
 var blur = (function() {
   var i;
   var blur = [];
-  for(i = 0; i < BLUR_SIZE*BLUR_SIZE; i++) {
+  for(i = 0; i < setting.BLUR_SIZE*setting.BLUR_SIZE; i++) {
     blur.push(1);
   }
   return blur;
@@ -269,7 +293,7 @@ var blur = (function() {
 // Edge filter
 var edge = (function() {
   var edge = [];
-  var len = EDGE_SIZE*EDGE_SIZE;
+  var len = setting.EDGE_SIZE*setting.EDGE_SIZE;
   for(i = 0; i < len; i++) {
     edge.push(1);
   }
@@ -281,6 +305,28 @@ function init() {
   canvas = document.getElementById("canvas");
   ctx = canvas.getContext("2d");
 
+  // For drag and drop image
+  canvas.addEventListener("dragover", function (e) {
+    e.preventDefault();
+  }, false);
+
+  // Handle dropped image file - only Firefox and Google Chrome
+  canvas.addEventListener("drop", function (e) {
+    var files = e.dataTransfer.files;
+    if (files.length > 0) {
+      var file = files[0];
+      if (typeof FileReader !== "undefined" && file.type.indexOf("image") != -1) {
+        var reader = new FileReader();
+        // Note: addEventListener doesn't work in Google Chrome for this event
+        reader.onload = function (e) {
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+    e.preventDefault();
+  }, false);
+
   img = new Image();
   img.crossOrigin = "Anonymous";
   img.addEventListener("load", imgLoaded, false);
@@ -289,12 +335,24 @@ function init() {
 
 function imgLoaded() {
   // Statements to be executed after image is loaded but before it is drawn
+  modifyImage();
   generateDelaunay();
 }
 
+function modifyImage() {
+  var factor = 1;
+  var width = img.width;
+  var height = img.height;
+  if(width > window.innerWidth || height > window.innerHeight) {
+    factor = Math.min(window.innerWidth/width, window.innerHeight/height);
+  }
+  img.width *= factor;
+  img.height *= factor;
+}
+
 function generateDelaunay() {
-  var width = canvas.width = img.width/4;
-  var height = canvas.height = img.height/4;
+  var width = canvas.width = img.width;
+  var height = canvas.height = img.height;
   ctx.drawImage(img, 0, 0, width, height);
 
   var imgData = ctx.getImageData(0, 0, width, height);
@@ -310,9 +368,9 @@ function generateDelaunay() {
      lesser number of points, i.e. points.length*POINT_RATE. Also, we do not
      want the number of points to exceed MAX_POINTS as the triangulation will
      take more time */
-  var limit = points.length*POINT_RATE;
-  if(limit > MAX_POINTS) {
-    limit = MAX_POINTS
+  var limit = points.length*setting.POINT_RATE;
+  if(limit > setting.MAX_POINTS) {
+    limit = setting.MAX_POINTS
   }
   points = removePoints(points, limit);
 
@@ -372,7 +430,7 @@ function getPoints(imageData) {
           }
         }
       }
-      if(sum/total > EDGE_THRESHOLD)
+      if(sum/total > setting.EDGE_THRESHOLD)
         points.push(new Array(col, row));
     }
   }
